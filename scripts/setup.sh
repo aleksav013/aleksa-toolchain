@@ -1,5 +1,7 @@
 #!/bin/sh
 
+SYSROOT=/opt/aleksa
+
 download()
 {
     if [ ! -f "./binutils-2.37.tar.gz" ]; then
@@ -29,25 +31,77 @@ patch_gnu()
 
     if [ ! -d "./binutils-2.37" ]; then
         cp -r "../binutils-2.37" .
-        patch -p0 < "./scripts/aleksa-binutils-2.37.diff"
+        patch -p0 < "../scripts/aleksa-binutils-2.37.diff"
+        cd "./binutils-2.37/ld" || exit
+        sed -i "s/2.69/2.71/" "Makefile.am"
+        aclocal
+        automake
+        cd "../.." || exit
     fi
 
     if [ ! -d "./gcc-11.2.0" ]; then
         cp -r "../gcc-11.2.0" .
         patch -p0 < "../scripts/aleksa-gcc-11.2.0.diff"
+        cd "./gcc-11.2.0/libstdc++-v3" || exit
+        sed -i "s/2.69/2.71/" "../config/override.m4"
+        autoreconf
+        cd "../.." || exit
     fi
 }
 
-build()
+build_binutils()
 {
     cd "./binutils-2.37" || exit
-    ../../../scripts/binutils_build.sh
-    cd .. || exit
 
-    
-    cd "./binutils-2.37" || exit
-    ../../../scripts/gcc_build.sh
-    cd .. || exit
+    mkdir -p build
+    cd build || exit
+
+    if [ ! -f Makefile ]; then
+        ../configure --target=i686-aleksa \
+            --prefix=/usr \
+            --with-sysroot="$SYSROOT" \
+            --bindir=/usr/bin \
+            --libdir=/usr/lib \
+            --disable-nls \
+            --disable-werror
+    fi
+
+    make -j4
+    make DESTDIR="$SYSROOT" install
+
+    cd "../.." || exit
+}
+
+install_headers()
+{
+    ../scripts/install_headers.sh
+}
+
+build_gcc()
+{
+    cd "./gcc-11.2.0" || exit
+
+    mkdir -p build
+    cd build || exit
+
+    if [ ! -f Makefile ]; then
+        ../configure --target=i686-aleksa \
+            --prefix=/usr \
+            --with-sysroot="$SYSROOT" \
+            --disable-nls \
+            --disable-plugin \
+            --enable-languages=c,c++
+    fi
+
+    make -j4 all-gcc
+    make -j4 all-target-libgcc
+
+    make -k check || true
+
+    make DESTDIR="$SYSROOT" install-gcc
+    make DESTDIR="$SYSROOT" install-target-libgcc
+
+    cd "../.." || exit
 }
 
 main()
@@ -55,7 +109,9 @@ main()
     download
     extract
     patch_gnu
-#    build
+    install_headers
+    build_binutils
+    build_gcc
 }
 
 main
