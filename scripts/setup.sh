@@ -58,16 +58,13 @@ build_binutils()
 
     if [ ! -f Makefile ]; then
         ../configure --target=i686-aleksa \
-            --prefix=/usr \
+            --prefix="$SYSROOT/usr" \
             --with-sysroot="$SYSROOT" \
-            --bindir=/usr/bin \
-            --libdir=/usr/lib \
-            --disable-nls \
-            --disable-werror
+            --disable-nls
     fi
 
     make -j4
-    make DESTDIR="$SYSROOT" install
+    make install
 
     cd "../.." || exit
 }
@@ -86,10 +83,9 @@ build_gcc()
 
     if [ ! -f Makefile ]; then
         ../configure --target=i686-aleksa \
-            --prefix=/usr \
+            --prefix="$SYSROOT/usr" \
             --with-sysroot="$SYSROOT" \
             --disable-nls \
-            --disable-plugin \
             --enable-languages=c,c++
     fi
 
@@ -98,8 +94,8 @@ build_gcc()
 
     make -k check || true
 
-    make DESTDIR="$SYSROOT" install-gcc
-    make DESTDIR="$SYSROOT" install-target-libgcc
+    make install-gcc
+    make install-target-libgcc
 
     cd "../.." || exit
 }
