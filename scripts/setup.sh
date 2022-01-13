@@ -31,7 +31,7 @@ patch_gnu()
 
     if [ ! -d "./binutils-2.37" ]; then
         cp -r "../binutils-2.37" .
-        patch -p0 < "../scripts/aleksa-binutils-2.37.diff"
+        patch -p0 < "../files/aleksa-binutils-2.37.diff"
         cd "./binutils-2.37/ld" || exit
         sed -i "s/2.69/2.71/" "Makefile.am"
         aclocal
@@ -41,17 +41,23 @@ patch_gnu()
 
     if [ ! -d "./gcc-11.2.0" ]; then
         cp -r "../gcc-11.2.0" .
-        patch -p0 < "../scripts/aleksa-gcc-11.2.0.diff"
+        patch -p0 < "../files/aleksa-gcc-11.2.0.diff"
         cd "./gcc-11.2.0/libstdc++-v3" || exit
         sed -i "s/2.69/2.71/" "../config/override.m4"
         autoreconf
         cd "../.." || exit
     fi
+    cd ".." || exit
+}
+
+install_headers()
+{
+    ./scripts/install_headers.sh
 }
 
 build_binutils()
 {
-    cd "./binutils-2.37" || exit
+    cd "./mine/binutils-2.37" || exit
 
     mkdir -p build
     cd build || exit
@@ -66,17 +72,12 @@ build_binutils()
     make -j4
     make install
 
-    cd "../.." || exit
-}
-
-install_headers()
-{
-    ../scripts/install_headers.sh
+    cd "../../.." || exit
 }
 
 build_gcc()
 {
-    cd "./gcc-11.2.0" || exit
+    cd "./mine/gcc-11.2.0" || exit
 
     mkdir -p build
     cd build || exit
@@ -86,18 +87,22 @@ build_gcc()
             --prefix="$SYSROOT/usr" \
             --with-sysroot="$SYSROOT" \
             --disable-nls \
+            --disable-plugin \
             --enable-languages=c,c++
     fi
 
-    make -j4 all-gcc
-    make -j4 all-target-libgcc
+    make -j4 all-gcc all-target-libgcc
+    make install-gcc install-target-libgcc
 
-    make -k check || true
+    cd "../../.." || exit
+}
 
-    make install-gcc
-    make install-target-libgcc
+additions()
+{
+    GCC_INCLUDE=$(i686-aleksa-gcc --print-file-name=)
 
-    cd "../.." || exit
+    i686-aleksa-as files/crt0.s -o "$GCC_INCLUDE/crt0.o"
+    touch "$GCC_INCLUDE/libc.a"
 }
 
 main()
@@ -108,6 +113,7 @@ main()
     install_headers
     build_binutils
     build_gcc
+    additions
 }
 
 main
