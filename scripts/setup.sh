@@ -2,25 +2,29 @@
 
 SYSROOT=/opt/aleksa
 
+BINUTILS=binutils-2.37
+GCC=gcc-11.2.0
+
+
 download()
 {
-    if [ ! -f "./binutils-2.37.tar.gz" ]; then
-        wget "https://ftp.gnu.org/gnu/binutils/binutils-2.37.tar.gz"
+    if [ ! -f "./$BINUTILS.tar.gz" ]; then
+        wget "https://ftp.gnu.org/gnu/binutils/$BINUTILS.tar.gz"
     fi
 
-    if [ ! -f "./gcc-11.2.0.tar.gz" ]; then
-        wget "https://ftp.gnu.org/gnu/gcc/gcc-11.2.0/gcc-11.2.0.tar.gz"
+    if [ ! -f "./$GCC.tar.gz" ]; then
+        wget "https://ftp.gnu.org/gnu/gcc/$GCC/$GCC.tar.gz"
     fi
 }
 
 extract()
 {
-    if [ ! -d "./binutils-2.37" ]; then
-        tar xzvf "./binutils-2.37.tar.gz"
+    if [ ! -d "./$BINUTILS" ]; then
+        tar xzvf "./$BINUTILS.tar.gz"
     fi
 
-    if [ ! -d "./gcc-11.2.0" ]; then
-        tar xzvf "./gcc-11.2.0.tar.gz"
+    if [ ! -d "./$GCC" ]; then
+        tar xzvf "./$GCC.tar.gz"
     fi
 }
 
@@ -29,35 +33,42 @@ patch_gnu()
     mkdir -p "./mine"
     cd "./mine" || exit
 
-    if [ ! -d "./binutils-2.37" ]; then
-        cp -r "../binutils-2.37" .
-        patch -p0 < "../files/aleksa-binutils-2.37.diff"
-        cd "./binutils-2.37/ld" || exit
+    if [ ! -d "./$BINUTILS" ]; then
+        cp -r "../$BINUTILS" .
+        patch -p0 < "../files/aleksa-$BINUTILS.diff"
+        cd "./$BINUTILS/ld" || exit
         sed -i "s/2.69/2.71/" "Makefile.am"
         aclocal
         automake
-        cd "../.." || exit
+        cd "../.."
     fi
 
-    if [ ! -d "./gcc-11.2.0" ]; then
-        cp -r "../gcc-11.2.0" .
-        patch -p0 < "../files/aleksa-gcc-11.2.0.diff"
-        cd "./gcc-11.2.0/libstdc++-v3" || exit
+    if [ ! -d "./$GCC" ]; then
+        cp -r "../$GCC" .
+        patch -p0 < "../files/aleksa-$GCC.diff"
+        cd "./$GCC/libstdc++-v3" || exit
         sed -i "s/2.69/2.71/" "../config/override.m4"
         autoreconf
-        cd "../.." || exit
+        cd "../.."
     fi
-    cd ".." || exit
+
+    cd ".."
 }
 
 install_headers()
 {
+    if [ ! -d "mykernel" ]; then
+        git clone https://github.com/aleksav013/mykernel
+    fi
+
+    cd "mykernel" || exit
     ./scripts/install_headers.sh
+    cd ".."
 }
 
 build_binutils()
 {
-    cd "./mine/binutils-2.37" || exit
+    cd "./mine/$BINUTILS" || exit
 
     mkdir -p build
     cd build || exit
@@ -72,12 +83,12 @@ build_binutils()
     make -j4
     make install
 
-    cd "../../.." || exit
+    cd "../../.."
 }
 
 build_gcc()
 {
-    cd "./mine/gcc-11.2.0" || exit
+    cd "./mine/$GCC" || exit
 
     mkdir -p build
     cd build || exit
@@ -91,10 +102,15 @@ build_gcc()
             --enable-languages=c,c++
     fi
 
-    make -j4 all-gcc all-target-libgcc
-    make install-gcc install-target-libgcc
+    make -j4 all-gcc
+    make -j4 all-target-libgcc
 
-    cd "../../.." || exit
+    make -k check || true
+
+    make install-gcc
+    make install-target-libgcc
+
+    cd "../../.."
 }
 
 additions()
