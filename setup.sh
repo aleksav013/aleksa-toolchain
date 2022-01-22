@@ -19,34 +19,34 @@ download()
 
 extract()
 {
-    if [ ! -d "./$BINUTILS" ]; then
-        tar xzvf "./$BINUTILS.tar.gz"
+    if [ ! -d "$BINUTILS" ]; then
+        tar xzvf "$BINUTILS.tar.gz"
     fi
 
-    if [ ! -d "./$GCC" ]; then
-        tar xzvf "./$GCC.tar.gz"
+    if [ ! -d "$GCC" ]; then
+        tar xzvf "$GCC.tar.gz"
     fi
 }
 
 patch_gnu()
 {
-    mkdir -p "./mine"
-    cd "./mine" || exit
+    mkdir -p "mine"
+    cd "mine" || exit
 
-    if [ ! -d "./$BINUTILS" ]; then
-        cp -r "../$BINUTILS" .
+    if [ ! -d "$BINUTILS" ]; then
+        cp -rv "../$BINUTILS" .
         patch -p0 < "../files/aleksa-$BINUTILS.diff"
-        cd "./$BINUTILS/ld" || exit
+        cd "$BINUTILS/ld" || exit
         sed -i "s/2.69/2.71/" "Makefile.am"
         aclocal
         automake
         cd "../.."
     fi
 
-    if [ ! -d "./$GCC" ]; then
-        cp -r "../$GCC" .
+    if [ ! -d "$GCC" ]; then
+        cp -rv "../$GCC" .
         patch -p0 < "../files/aleksa-$GCC.diff"
-        cd "./$GCC/libstdc++-v3" || exit
+        cd "$GCC/libstdc++-v3" || exit
         sed -i "s/2.69/2.71/" "../config/override.m4"
         autoreconf
         cd "../.."
@@ -57,8 +57,12 @@ patch_gnu()
 
 install_headers()
 {
-    if [ ! -d "mykernel" ]; then
-        git clone https://github.com/aleksav013/mykernel
+    if [ -d "mykernel" ]; then
+        cd "mykernel" || exit
+        git pull
+        cd ".."
+    else
+        git clone "https://github.com/aleksav013/mykernel"
     fi
 
     cd "mykernel" || exit
@@ -102,23 +106,26 @@ build_gcc()
             --enable-languages=c,c++
     fi
 
-    make -j4 all-gcc
-    make -j4 all-target-libgcc
-
+    make -j4 all-gcc all-target-libgcc
     make -k check || true
-
-    make install-gcc
-    make install-target-libgcc
+    make install-gcc install-target-libgcc
 
     cd "../../.."
 }
 
-additions()
+setup_compiler()
 {
-    GCC_INCLUDE=$(i686-aleksa-gcc --print-file-name=)
+    if [ -d "mykernel" ]; then
+        cd "mykernel" || exit
+        git pull
+        cd ".."
+    else
+        git clone "https://github.com/aleksav013/mykernel"
+    fi
 
-    i686-aleksa-as files/crt0.s -o "$GCC_INCLUDE/crt0.o"
-    touch "$GCC_INCLUDE/libc.a"
+    cd "mykernel" || exit
+    ./scripts/setup_compiler.sh
+    cd ".."
 }
 
 main()
@@ -126,10 +133,10 @@ main()
     download
     extract
     patch_gnu
-    install_headers
     build_binutils
+    install_headers
     build_gcc
-    additions
+    setup_compiler
 }
 
 main
